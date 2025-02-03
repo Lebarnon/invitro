@@ -160,7 +160,8 @@ func (d *MultiLoaderRunner) unpackFromTraceDir(study types.LoaderStudy) []types.
 	for _, file := range files {
 		tracePath := path.Join(study.TracesDir, file.Name())
 		newExperiment := d.createExperimentFromStudy(study, file.Name(), tracePath)
-		experiments = append(experiments, newExperiment)
+		sweepedExperiments := d.unpackSweepOptions(study, newExperiment)
+		experiments = append(experiments, sweepedExperiments...)
 	}
 	return experiments
 }
@@ -174,7 +175,8 @@ func (d *MultiLoaderRunner) unpackFromTraceValues(study types.LoaderStudy) []typ
 		tracePath := strings.Replace(study.TracesFormat, ml_common.TraceFormatString, fmt.Sprintf("%v", traceValue), -1)
 		fileName := path.Base(tracePath)
 		newExperiment := d.createExperimentFromStudy(study, fileName, tracePath)
-		experiments = append(experiments, newExperiment)
+		sweepedExperiments := d.unpackSweepOptions(study, newExperiment)
+		experiments = append(experiments, sweepedExperiments...)
 	}
 	return experiments
 }
@@ -192,7 +194,8 @@ func (d *MultiLoaderRunner) unpackSingleExperiment(study types.LoaderStudy) []ty
 	}
 	study.OutputDir = pathDir
 	newExperiment := d.createExperimentFromStudy(study, study.Name, "")
-	experiments = append(experiments, newExperiment)
+	sweepedExperiments := d.unpackSweepOptions(study, newExperiment)
+	experiments = append(experiments, sweepedExperiments...)
 	return experiments
 }
 
@@ -248,6 +251,106 @@ func (d *MultiLoaderRunner) addCommandFlagsToExperiment(experiment types.LoaderE
 	if !experiment.Generated {
 		experiment.Generated = d.MultiLoaderConfig.Generated
 	}
+}
+
+func (d *MultiLoaderRunner) unpackSweepOptions(study types.LoaderStudy, experiment types.LoaderExperiment) []types.LoaderExperiment {
+	if len(study.Sweep) == 0 {
+		log.Debug("No sweep options provided")
+		return []types.LoaderExperiment{experiment}
+	}
+	// validate each sweep option
+	for _, sweepOption := range study.Sweep {
+		if err := sweepOption.Validate(); err != nil {
+			log.Fatal(err)
+		}
+	}
+
+	switch study.SweepType {
+	case ml_common.GridSweepType:
+		return d.unpackGridSweep(study, experiment)
+	case ml_common.LinearSweepType:
+		return d.unpackLinearSweep(study, experiment)
+	default:
+		// Default to grid sweep
+		return d.unpackGridSweep(study, experiment)
+	}
+}
+
+func (d *MultiLoaderRunner) unpackGridSweep(study types.LoaderStudy, experiment types.LoaderExperiment) []types.LoaderExperiment {
+	var experiments []types.LoaderExperiment
+	numOfSweepOptions := len(study.Sweep)
+	optionsLength := make([]int, numOfSweepOptions)
+	for i, sweepOption := range study.Sweep {
+		optionsLength[i] = len(sweepOption.Values) - 1
+	}
+	np := ml_common.NextCProduct(optionsLength)
+	for {
+		indices := np()
+		if len(indices) == 0 {
+			break
+		}
+		newExperiment, err := common.DeepCopy(experiment)
+		if err != nil {
+			log.Fatal("Error when deep copying experiment", err)
+		}
+		experimentPostFix := ml_common.SweepOptionsToPostfix(study.Sweep, indices)
+		newExperiment.Name = experiment.Name + experimentPostFix
+		paths := ml_common.SplitPath(experiment.Config["OutputPathPrefix"].(string))
+		// update the last two paths with the sweep indices
+		paths[len(paths)-2] = paths[len(paths)-2] + experimentPostFix
+		paths[len(paths)-1] = paths[len(paths)-1] + experimentPostFix
+
+		newExperiment.Config["OutputPathPrefix"] = path.Join(paths...)
+
+		for i, index := range indices {
+			newExperiment.Config[study.Sweep[i].Field] = study.Sweep[i].Values[index]
+		}
+		experiments = append(experiments, newExperiment)
+	}
+	return experiments
+}
+
+func (d *MultiLoaderRunner) unpackLinearSweep(study types.LoaderStudy, experiment types.LoaderExperiment) []types.LoaderExperiment {
+	var experiments []types.LoaderExperiment
+	numOfSweepOptions := len(study.Sweep)
+
+	// Validate that all options have the same number of values
+	numOfSweepValues := len(study.Sweep[0].Values)
+
+	for i := 1; i < numOfSweepOptions; i++ {
+		if len(study.Sweep[i].Values) != numOfSweepValues {
+			log.Fatal("All sweep options must have the same number of values")
+		}
+	}
+
+	// Create experiments for each sweep value
+	for i := 0; i < numOfSweepValues; i++ {
+		newExperiment, err := common.DeepCopy(experiment)
+		if err != nil {
+			log.Fatal("Error when deep copying experiment", err)
+		}
+		indices := make([]int, numOfSweepOptions)
+		for j := range indices {
+			indices[j] = i
+		}
+
+		experimentPostFix := ml_common.SweepOptionsToPostfix(study.Sweep, indices)
+		newExperiment.Name = experiment.Name + experimentPostFix
+		// Update output path prefix
+		paths := ml_common.SplitPath(experiment.Config["OutputPathPrefix"].(string))
+		// update the last two paths with the sweep indices
+		paths[len(paths)-2] = paths[len(paths)-2] + experimentPostFix
+		paths[len(paths)-1] = paths[len(paths)-1] + experimentPostFix
+
+		newExperiment.Config["OutputPathPrefix"] = path.Join(paths...)
+
+		for j := 0; j < numOfSweepOptions; j++ {
+			newExperiment.Config[study.Sweep[j].Field] = study.Sweep[j].Values[i]
+		}
+		experiments = append(experiments, newExperiment)
+	}
+
+	return experiments
 }
 
 /**

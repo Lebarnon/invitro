@@ -12,12 +12,20 @@
             "TracesFormat": "data/multi_traces/example_{}_test",
             "TraceValues": [
                 "1",
-                "2",
-                3.1
+                "2"
             ],
             "OutputDir": "data/out/multi-test",
             "PreScript": "",
-            "PostScript": ""
+            "PostScript": "",
+            "Sweep": [
+                {
+                    "Field": "Seed",
+                    "Values": [
+                        "1",
+                        "2"
+                    ]
+                }
+            ]
         }
     ],
     "IatGeneration": false,
