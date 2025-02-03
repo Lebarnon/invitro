@@ -120,7 +120,7 @@ jobs:
           fi
 
           # Check for errors in output CSV file
-          file=$(find . -name "*_example_1_test/example_1_test_duration_1.csv")
+          file=$(find . -wholename "*_example_1_test/example_1_test_duration_1.csv")
 
           if [ ! -f "$file" ]; then
             echo "File $file not found!"
@@ -135,7 +135,8 @@ jobs:
           # Check if advanced logs output are present
           # in data/out/multi-test/test-experiment/*_example_1_test/, there should be folders called ["top", "autoscaler", "activator"] and each folder should have at least one file
           for metric in top autoscaler activator; do
-            if [ ! -d "data/out/multi-test/test-experiment/*_example_1_test/$metric" ]; then
+            folder="data/out/multi-test/test-experiment/*_example_1_test/$metric"
+            if [ ! -d $folder ]; then
               echo "Folder $metric not found! Expected to find $metric folder"
               exit 1
             fi
