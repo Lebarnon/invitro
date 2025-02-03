@@ -67,7 +67,7 @@ jobs:
         run: |
           kn service delete --all
   adv-log-collection:
-    name: Test Advanced Log Collection
+    name: Test Multi-Loader Advanced Log Collection
     env:
       KIND_VERSION: v0.22.0
       K8S_VERSION: v1.29
@@ -101,7 +101,7 @@ jobs:
           jq --arg m "$metrics" '
             .Metrics = ($m | fromjson) |
             .Studies[0].TraceValues = ["1"]
-          ' multi_loader_config.json > tmp.json && mv tmp.json multi_loader_config.json
+          ' tools/multi_loader/multi_loader_config.json > tmp.json && mv tmp.json tools/multi_loader/multi_loader_config.json
 
           echo "multi_loader_config.json modified successfully"
 
@@ -147,5 +147,10 @@ jobs:
           done
 
           echo "No errors found in output files"
+
+      - name: Down
+        if: ${{ always() }}
+        run: |
+          kn service delete --all
 
   
