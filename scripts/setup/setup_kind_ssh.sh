@@ -24,7 +24,8 @@ kubectl create -f ssh_pub.yaml
 echo "Installing ssh server in target pod"
 docker exec knative-control-plane apt-get update
 docker exec knative-control-plane apt-get install -y openssh-server
-
+## Install other packages
+docker exec knative-control-plane apt-get install -y psmisc
 # Edit sshd_config
 echo "Editing sshd_config"
 docker exec knative-control-plane sed -i 's/^#\?PasswordAuthentication.*/PasswordAuthentication no/' /etc/ssh/sshd_config
@@ -34,7 +35,7 @@ docker exec knative-control-plane systemctl restart sshd
 
 # Add user 
 echo "Adding user"
-docker exec knative-control-plane adduser --disabled-password --allow-bad-names --gecos "" $(whoami)
+docker exec knative-control-plane adduser --disabled-password --allow-bad-names --gecos "" $(whoami) sudo
 
 # Add keys to user's authorized_keys
 echo "Adding keys to authorized_keys"
@@ -48,3 +49,7 @@ docker exec knative-control-plane chown -R $(whoami):$(whoami) /home/$(whoami)/.
 
 # Clean up
 rm ssh_pub.yaml
+
+# Update /var user group and permission
+docker exec knative-control-plane chown -R $(whoami):$(whoami) /var
+docker exec knative-control-plane chmod -R 777 /var
