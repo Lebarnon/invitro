@@ -234,6 +234,7 @@ func (m *MetricManager) uniqueNodeList() []string {
 	for node := range uniqueNodes {
 		nodes = append(nodes, strings.TrimSpace(node))
 	}
+	log.Trace("Unique nodes: ", nodes)
 	return nodes
 }
 
