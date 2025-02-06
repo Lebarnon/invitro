@@ -1,6 +1,13 @@
 package types
 
-import "errors"
+import (
+	"errors"
+	"strings"
+)
+
+const (
+	FORMAT_PLACEHOLDER = "{}"
+)
 
 type MultiLoaderConfiguration struct {
 	Studies        []LoaderStudy `json:"Studies"`
@@ -46,6 +53,7 @@ type LoaderExperiment struct {
 type SweepOptions struct {
 	Field  string        `json:"Field"`
 	Values []interface{} `json:"Values"`
+	Format string        `json:"Format"`
 }
 
 func (so *SweepOptions) Validate() error {
@@ -54,6 +62,9 @@ func (so *SweepOptions) Validate() error {
 	}
 	if len(so.Values) == 0 {
 		return errors.New(so.Field + " missing sweep values")
+	}
+	if so.Format != "" && !strings.Contains(so.Format, FORMAT_PLACEHOLDER) {
+		return errors.New("Invalid format, expected " + FORMAT_PLACEHOLDER + " in " + so.Format)
 	}
 	return nil
 }

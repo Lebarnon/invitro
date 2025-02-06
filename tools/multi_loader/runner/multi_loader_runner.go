@@ -265,6 +265,15 @@ func (d *MultiLoaderRunner) unpackSweepOptions(study types.LoaderStudy, experime
 			log.Fatal(err)
 		}
 	}
+	// Unpack sweep values if using sweep format
+	log.Debug("Unpacking sweep options")
+	for _, sweepOption := range study.Sweep {
+		if sweepOption.Format != "" {
+			for index, value := range sweepOption.Values {
+				sweepOption.Values[index] = strings.Replace(sweepOption.Format, types.FORMAT_PLACEHOLDER, fmt.Sprintf("%v", value), -1)
+			}
+		}
+	}
 
 	switch study.SweepType {
 	case ml_common.GridSweepType:
