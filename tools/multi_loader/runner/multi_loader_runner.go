@@ -83,12 +83,10 @@ func (d *MultiLoaderRunner) RunActual() {
 **/
 func (d *MultiLoaderRunner) run() {
 	// Run global prescript
-	common.RunScript(d.MultiLoaderConfig.PreScript)
+	common.RunCommand(d.MultiLoaderConfig.PreScript)
 	// Iterate over studies and run them
 	for si, study := range d.MultiLoaderConfig.Studies {
 		log.Debug("Setting up study: ", study.Name)
-		// Run pre script
-		common.RunScript(study.PreScript)
 
 		// Unpack study to a list of studies with different loader configs
 		experimentsPartialConfig := d.unpackStudy(study)
@@ -100,6 +98,8 @@ func (d *MultiLoaderRunner) run() {
 			} else {
 				log.Info(fmt.Sprintf("[Study %d/%d][Experiment %d/%d] Running %s", si+1, len(d.MultiLoaderConfig.Studies), ei+1, len(experimentsPartialConfig), experiment.Name))
 			}
+			// Run pre script
+			common.RunCommand(experiment.PreScript)
 
 			// Prepare experiment: merge with base config, create output dir and write merged config to temp file
 			d.prepareExperiment(experiment)
@@ -109,20 +109,21 @@ func (d *MultiLoaderRunner) run() {
 			// Perform cleanup
 			d.performCleanup()
 
+			// Run post script
+			common.RunCommand(experiment.PostScript)
+
 			// Check if should continue this study
 			if err != nil {
 				log.Error("Experiment failed: ", experiment.Name, ". Skipping remaining experiments in study...")
 				break
 			}
 		}
-		// Run post script
-		common.RunScript(study.PostScript)
 		if len(experimentsPartialConfig) > 1 && !d.DryRun {
 			log.Info("All experiments for ", study.Name, " completed")
 		}
 	}
 	// Run global postscript
-	common.RunScript(d.MultiLoaderConfig.PostScript)
+	common.RunCommand(d.MultiLoaderConfig.PostScript)
 }
 
 /**
@@ -303,7 +304,13 @@ func (d *MultiLoaderRunner) unpackGridSweep(study types.LoaderStudy, experiment 
 		newExperiment.Config["OutputPathPrefix"] = path.Join(paths...)
 
 		for i, index := range indices {
-			newExperiment.Config[study.Sweep[i].Field] = study.Sweep[i].Values[index]
+			if study.Sweep[i].Field == "PreScript" {
+				newExperiment.PreScript = study.Sweep[i].Values[index].(string)
+			} else if study.Sweep[i].Field == "PostScript" {
+				newExperiment.PostScript = study.Sweep[i].Values[index].(string)
+			} else {
+				newExperiment.Config[study.Sweep[i].Field] = study.Sweep[i].Values[index]
+			}
 		}
 		experiments = append(experiments, newExperiment)
 	}
@@ -345,7 +352,13 @@ func (d *MultiLoaderRunner) unpackLinearSweep(study types.LoaderStudy, experimen
 		newExperiment.Config["OutputPathPrefix"] = path.Join(paths...)
 
 		for j := 0; j < numOfSweepOptions; j++ {
-			newExperiment.Config[study.Sweep[j].Field] = study.Sweep[j].Values[i]
+			if study.Sweep[j].Field == "PreScript" {
+				newExperiment.PreScript = study.Sweep[j].Values[i].(string)
+			} else if study.Sweep[j].Field == "PostScript" {
+				newExperiment.PostScript = study.Sweep[j].Values[i].(string)
+			} else {
+				newExperiment.Config[study.Sweep[j].Field] = study.Sweep[j].Values[i]
+			}
 		}
 		experiments = append(experiments, newExperiment)
 	}
